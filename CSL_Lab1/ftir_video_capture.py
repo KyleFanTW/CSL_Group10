@@ -3,12 +3,15 @@ import numpy as np
 import os
 import tkinter
 import subprocess
+import math
+
+from digit_recognition import classify
 # Choose your webcam: 0, 1, ...
 cap = cv2.VideoCapture(1)
 
 r_thres = 20
-b_thres = 100
-area_thres = 50
+b_thres = 0
+area_thres = 15
 
 def show_image(path):
 	img = cv2.imread(path)
@@ -34,28 +37,52 @@ def get_slider_values():
 subprocess.Popen('python3 .\\ftir_image_processing.py', shell=True)
 
 # Function that creates empty image with white background
-def create_empty_image():
-	width = int(cap.get(3))
-	height = int(cap.get(4))
-	return 255 * np.ones((height, width, 3), dtype="uint8")
-
-clear_frame = 240
-idle_frame = 0
+def create_empty_image(dim):
+	return np.zeros((dim, dim, 3), dtype="uint8")
 
 path_image = None
 
+def flip_save():
+	flipped_path_image = cv2.flip(path_image, 1)
+	cv2.imwrite('CSL_Group10\\CSL_Lab1\\path_image.png', flipped_path_image)
+
+flag = 0
+
+def clear_save():
+	print('[clear_save()]: Clearing path_image and saving flipped version to current directory')
+	flip_save()
+	flag = 0
+	return create_empty_image(cropped_image_dim)
+
+def euclidean_distance(point1, point2):
+    x1, y1 = point1
+    x2, y2 = point2
+    return math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
+
+clear_frame = 240
+sample_frame = 30
+frame_counter = 0
+
+cropped_image_dim = min(int(cap.get(3)), int(cap.get(4)))
+
 # create_slider()
+
+px = 0
+py = 0
 
 while(True):
 
+	frame_counter += 1 # For sampling
+
 	if path_image is None:
 		# Create an empty image using width and height of camera
-		width = int(cap.get(3))
-		height = int(cap.get(4))
-		path_image = create_empty_image()
-
+		path_image = create_empty_image(cropped_image_dim)
 	# Get one frame from the camera
-	ret, frame = cap.read()
+	# Crop the frames
+	
+	ret, ori_frame = cap.read()
+	frame = ori_frame[:cropped_image_dim][:cropped_image_dim]
+	
 
 	# Split RGB channels
 
@@ -65,7 +92,7 @@ while(True):
 
 	# Perform thresholding to each channel
 
-	# _, _, _ = get_slider_values()
+	# r_thres, b_thres, area_thres = get_slider_values()
 
 	_, r = cv2.threshold(r, r_thres, 255, cv2.THRESH_BINARY)
 	_, b_inv = cv2.threshold(b, b_thres, 255, cv2.THRESH_BINARY_INV)
@@ -83,20 +110,11 @@ while(True):
 
 	# Iterate through each contour, check the area and find the center
 
-	if len(contours) == 0:
-		idle_frame += 1
-		if idle_frame == clear_frame:
-			print('idle: Clearing path_image and saving flipped version to current directory')
-			#path_image = cv2.resize(path_image, (28, 28))
-			# Change the color black to white, and red to black
-			path_image = cv2.cvtColor(path_image, cv2.COLOR_BGR2GRAY)
-			flipped_path_image = cv2.flip(path_image, 1)
-			# Save the image to current directory
-			cv2.imwrite('path_image.png', flipped_path_image)
-			path_image = create_empty_image()
-			idle_frame = 0
-	else:
-		idle_frame = 0
+
+	if frame_counter > sample_frame:
+		frame_counter = 0
+		flip_save()
+		classify(21, 'CSL_Group10\\CSL_Lab1\\path_image.png')
 
 	for c in contours:
 		area = cv2.contourArea(c)
@@ -108,17 +126,33 @@ while(True):
 			# Put text with the center and radius
 			cv2.putText(display, "({}, {}) r={}".format(x, y, radius), (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
 			# Draw a dot on (x,y) on the path_image
-			cv2.circle(path_image, (x, y), 20, (0, 0, 0), -1)
+			cv2.circle(path_image, (x, y), 15, (255, 255, 255), -1)
+			if flag == 1 and euclidean_distance((px,py),(x,y)) < 100:
+				cv2.line(path_image, (px,py), (x,y), (255, 255, 255), 15)
+			elif flag == 0:
+				flag = 1
+			px = x
+			py = y
 
+
+	
 	# Show the frame
-	#cv2.imshow('frame', frame)
-	#cv2.imshow('display', cv2.merge([zeros, zeros, ret]))
+	cv2.imshow('frame', frame)
+	cv2.imshow('display', display)
+	cv2.imshow('red', cv2.merge([zeros, zeros, ret]))
 	flipped_path_image = cv2.flip(path_image, 1)
 	cv2.imshow('path', flipped_path_image)
 
+	
 	# Press q to quit
-	if cv2.waitKey(1) & 0xFF == ord('q'):
+	key_ret = cv2.waitKey(100) & 0xFF
+	if key_ret == ord('q'):
 		break
+	elif key_ret == ord('c'):
+		flip_save()
+		classify(21, 'CSL_Group10\\CSL_Lab1\\path_image.png')
+	elif key_ret == ord('s'):
+		path_image = clear_save()
 
 # Release the camera
 cap.release()
