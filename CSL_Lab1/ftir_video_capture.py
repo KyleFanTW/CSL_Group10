@@ -7,7 +7,7 @@ import math
 
 from digit_recognition import classify
 # Choose your webcam: 0, 1, ...
-cap = cv2.VideoCapture(1)
+cap = cv2.VideoCapture(0)
 
 r_thres = 20
 b_thres = 0
@@ -34,7 +34,7 @@ def get_slider_values():
 	return r_thres, b_thres, area_thres
 
 # Call a subprocess to run window
-subprocess.Popen('python3 .\\ftir_image_processing.py', shell=True)
+# subprocess.Popen('python3 ftir_image_processing.py', shell=True)
 
 # Function that creates empty image with white background
 def create_empty_image(dim):
@@ -42,9 +42,27 @@ def create_empty_image(dim):
 
 path_image = None
 
+def digit_zoom(img, padding):
+	contours, hierarchy = cv2.findContours(cv2.cvtColor(flipped_path_image, cv2.COLOR_BGR2GRAY), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+	# Find contour of the maximum area
+	if len(contours) == 0:
+		return img
+	sort_index = np.argsort([cv2.contourArea(c) for c in contours])
+	c = contours[sort_index[-1]]
+	(x, y), radius = cv2.minEnclosingCircle(c)
+	(x, y) = (int(x), int(y))
+	radius = int(radius+padding)
+
+	# Take only the image inside the circle
+	zoomed_image = img[y-radius:y+radius, x-radius:x+radius]
+
+	return zoomed_image
+	
+
 def flip_save():
 	flipped_path_image = cv2.flip(path_image, 1)
-	cv2.imwrite('CSL_Group10\\CSL_Lab1\\path_image.png', flipped_path_image)
+	cv2.imwrite('path_image.png', digit_zoom(flipped_path_image, 50))
+	
 
 flag = 0
 
@@ -60,7 +78,7 @@ def euclidean_distance(point1, point2):
     return math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
 
 clear_frame = 240
-sample_frame = 30
+sample_frame = 10
 frame_counter = 0
 
 cropped_image_dim = min(int(cap.get(3)), int(cap.get(4)))
@@ -114,7 +132,7 @@ while(True):
 	if frame_counter > sample_frame:
 		frame_counter = 0
 		flip_save()
-		classify(21, 'CSL_Group10\\CSL_Lab1\\path_image.png')
+		classify(21, 'path_image.png')
 
 	for c in contours:
 		area = cv2.contourArea(c)
@@ -126,9 +144,9 @@ while(True):
 			# Put text with the center and radius
 			cv2.putText(display, "({}, {}) r={}".format(x, y, radius), (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
 			# Draw a dot on (x,y) on the path_image
-			cv2.circle(path_image, (x, y), 15, (255, 255, 255), -1)
+			# cv2.circle(path_image, (x, y), 10, (255,255,255), -1)
 			if flag == 1 and euclidean_distance((px,py),(x,y)) < 100:
-				cv2.line(path_image, (px,py), (x,y), (255, 255, 255), 15)
+				cv2.line(path_image, (px,py), (x,y), (0,0,255), 18)
 			elif flag == 0:
 				flag = 1
 			px = x
@@ -138,8 +156,8 @@ while(True):
 	
 	# Show the frame
 	cv2.imshow('frame', frame)
-	cv2.imshow('display', display)
-	cv2.imshow('red', cv2.merge([zeros, zeros, ret]))
+	#cv2.imshow('display', display)
+	#cv2.imshow('red', cv2.merge([zeros, zeros, ret]))
 	flipped_path_image = cv2.flip(path_image, 1)
 	cv2.imshow('path', flipped_path_image)
 
@@ -150,7 +168,7 @@ while(True):
 		break
 	elif key_ret == ord('c'):
 		flip_save()
-		classify(21, 'CSL_Group10\\CSL_Lab1\\path_image.png')
+		classify(21, 'path_image.png')
 	elif key_ret == ord('s'):
 		path_image = clear_save()
 

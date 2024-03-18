@@ -4,8 +4,12 @@ import numpy as np
 import cv2
 # Use status bar to show the progress
 import matplotlib.pyplot as plt
+import tensorflow as tf
+import os
+from art import *
 
-model = load_model('digit_classifier.h5')
+loaded_model = tf.keras.models.load_model('digits_recognition_cnn_sec.h5')
+
 
 #(train_images, train_labels), (test_images, test_labels) = mnist.load_data()
 
@@ -20,11 +24,18 @@ def classify(k, test_image_path, test_image=None):
     else:
         ori_img = test_image
     cv2_img = cv2.resize(ori_img, (28, 28))
+    # Reshape to 1, 28, 28, 1
+    cv2.imshow('test_image', cv2_img)
+    cv2_img = cv2_img.reshape(1, 28, 28, 1)
     label = model_classify(cv2_img)
-    print('The label of the test image is:', label)
+    print('The label of the test image is:\n')
+    Art=text2art(str(label),"rand")
+    print(Art)
 
 def model_classify(img):
-    return np.argmax(model.predict(img))
+    prob = loaded_model.predict(img)
+    print(prob)
+    return np.argmax(prob)
 
 def euclidean_dis(x1, x2):
     return np.sqrt(np.sum((x1 - x2) ** 2))
